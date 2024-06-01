@@ -22,12 +22,10 @@ Date      	By	Comments
 22-05-2024	Kaixu Chen	initial version
 '''
 
-from mediapipe import solutions
-from mediapipe.framework.formats import landmark_pb2
 import numpy as np
 import cv2 
 import hydra
-import math
+import json
 
 from pathlib import Path
 from torchvision.io import read_video
@@ -87,9 +85,37 @@ def calc_distance(hand_landmarks):
     distance = np.sqrt((middle_finger_tip.x - wrist.x) ** 2 + (middle_finger_tip.y - wrist.y) ** 2)
     return distance
 
+def filter_index(index_list, dis_res, flag):
+    # 使用双指针找出连续的边界值
+    boundaries = []
+    start = 0 
+    n = len(index_list)
+
+    while start < n:
+        end = start
+        while end + 1 < n and index_list[end + 1] - index_list[end] == 1:
+            end += 1
+        boundaries.append([index_list[start], index_list[end]])
+        start = end + 1
+
+    # 找出每个区间的最大值, 并保存索引作为结果
+    res_idx = []
+    for (l, r) in boundaries:
+
+        bound_val = dis_res[l:r+1]
+        if flag == 'max':
+            val = max(bound_val)
+        else:
+            val = min(bound_val)
+
+        res_idx.append(dis_res.index(val))
+
+    return res_idx
+
 def process_one_video(frames, detector):
     
-    dis_res = [] 
+    dis_res = []
+    f, c, h, w = frames.shape 
 
     for img in frames:
         # STEP 3: Load the input image.
@@ -104,18 +130,58 @@ def process_one_video(frames, detector):
 
         dis_res.append(calc_distance(hand_landmarks))
 
-    return dis_res
+    # TODO: 从这里判断张开和闭合的界限
+    open_index_list = []
+    max_dis = max(dis_res) # open hand 
+    close_index_list = []
+    min_dis = min(dis_res) # close hand
+    bias = 0.05
 
-def process_label(label: Path, detector):
+    for i in range(f):
+        diff = abs(max_dis - dis_res[i])
+        if diff < bias:
+            open_index_list.append(i)
+        diff = abs(min_dis - dis_res[i])
+        if diff < bias:
+            close_index_list.append(i)
+
+    open_filter_index = filter_index(open_index_list, dis_res, 'max')
+    close_filter_index = filter_index(close_index_list, dis_res, 'min')
+    
+    return open_filter_index, close_filter_index
+
+def process_label(label: Path, detector, save_data_path):
     for one_person in label.iterdir():
         for one_video in one_person.iterdir():
+
+            print(one_video)
             vframes, _, info = read_video(one_video)
-            dis_res = process_one_video(vframes, detector)
+            open_filter_index, close_filter_index = process_one_video(vframes, detector)
 
-            # TODO: 从这里判断张开和闭合的界限
-            max_dis = max(dis_res)
-            min_dis = min(dis_res)
+            # 合并并排序
+            index_list = open_filter_index + close_filter_index
+            index_list.sort()
 
+            # save info 
+            save_info = {
+                'name': one_video.name,
+                'path': str(one_video),
+                'fps': info['video_fps'],
+                'open_cycle_index': open_filter_index,
+                'close_cycle_index': close_filter_index,
+                'cycle_index': index_list
+            }
+
+            # save to json
+            save_path = save_data_path / label.name / one_person.name
+            if save_path.exists() == False: 
+                save_path.mkdir(parents=True, exist_ok=True)
+
+            file_name = str(one_video.name.split('.')[0]) + '.json'
+            save_path = save_path / file_name
+
+            with open(save_path, 'w') as f:
+                json.dump(save_info, f, indent=4)
 
 @hydra.main(config_path="/workspace/code/config/", config_name="prepare_dataset")
 def main(cfg) -> None:
@@ -130,7 +196,7 @@ def main(cfg) -> None:
     detector = vision.HandLandmarker.create_from_options(options)
 
     for label in raw_data_path.iterdir():
-       process_label(label, detector)
+       process_label(label, detector, save_data_path)
 
 if '__main__' == __name__:
     main()
