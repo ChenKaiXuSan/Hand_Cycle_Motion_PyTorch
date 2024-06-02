@@ -1,0 +1,15 @@
+# hydra config
+hydra:
+  run:
+    dir: /workspace/code/logs/prepare_dataset/${now:%Y-%m-%d}/${now:%H-%M-%S}
+
+dt: 0.1 # time interval
+
+# path
+save_path: /workspace/data/pendulum/
+save_index_path: /workspace/data/pendulum/index_mapping/
+config_save_path: /workspace/data/pendulum/config/
+temp_save_fig_path: /workspace/data/pendulum/temp_fig/
+
+shape: ['circle', 'rect']
+degree_boundary: [90, 45]
