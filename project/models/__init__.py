@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 '''
-File: /workspace/code/project/dataloader/__init__.py
-Project: /workspace/code/project/dataloader
-Created Date: Sunday June 2nd 2024
+File: /workspace/code/project/models/__init__.py
+Project: /workspace/code/project/models
+Created Date: Monday June 3rd 2024
 Author: Kaixu Chen
 -----
 Comment:
 
 Have a good code time :)
 -----
-Last Modified: Sunday June 2nd 2024 2:04:23 pm
+Last Modified: Monday June 3rd 2024 7:45:58 am
 Modified By: the developer formerly known as Kaixu Chen at <chenkaixusan@gmail.com>
 -----
 Copyright (c) 2024 The University of Tsukuba
@@ -19,11 +19,8 @@ HISTORY:
 Date      	By	Comments
 ----------	---	---------------------------------------------------------
 '''
-
 import sys, os
 curr_path = os.path.dirname(__file__)
 sys.path.append(curr_path)
 
-from data_loader import *
-from video_dataset import *
-from customize_transforms import *
+from make_model import *

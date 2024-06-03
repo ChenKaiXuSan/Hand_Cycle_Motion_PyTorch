@@ -1,33 +1,24 @@
-"""
-File: data_loader.py
-Project: dataloader
-Created Date: 2023-10-19 02:24:47
-Author: chenkaixu
+#!/usr/bin/env python3
+# -*- coding:utf-8 -*-
+'''
+File: /workspace/code/project/dataloader/data_loader.py
+Project: /workspace/code/project/dataloader
+Created Date: Sunday June 2nd 2024
+Author: Kaixu Chen
 -----
 Comment:
-A pytorch lightning data module based dataloader, for train/val/test dataset prepare.
-Have a good code time!
+
+Have a good code time :)
 -----
-Last Modified: 2023-10-29 12:18:59
-Modified By: chenkaixu
+Last Modified: Sunday June 2nd 2024 2:03:44 pm
+Modified By: the developer formerly known as Kaixu Chen at <chenkaixusan@gmail.com>
+-----
+Copyright (c) 2024 The University of Tsukuba
 -----
 HISTORY:
-Date 	By 	Comments
-------------------------------------------------
-
-12-05-2024	Kaixu Chen	Now choose different kinds of experiments based on the EXPERIMENT keyword.
-temporal mix, late fusion and single (stance/swing/random)
-
-04-04-2024	Kaixu Chen	when use temporal mix, need keep same data process method for train/val dataset.
-
-25-03-2024	Kaixu Chen	change batch size for train/val dataloader. Now set bs=1 for gait cycle dataset, set bs=32 for default dataset (without gait cycle).
-Because in experiment, I found bs=1 will have large loss when train. Maybe also need gait cycle datset in val/test dataloader?
-
-22-03-2024	Kaixu Chen	add different class num mapping dict. In collate_fn, re-mapping the label from .json disease key.
-
-"""
-
-# %%
+Date      	By	Comments
+----------	---	---------------------------------------------------------
+'''
 
 from torchvision.transforms import (
     Compose,
@@ -38,31 +29,33 @@ from pytorchvideo.transforms import (
     UniformTemporalSubsample,
     Div255,
 )
+from customize_transforms import (
+    AddSaltAndPepperNoise,
+    AddGaussianNoise,
+    AddUniformNoise,
+)
 
 from typing import Any, Callable, Dict, Optional, Type
 from pytorch_lightning import LightningDataModule
-from pytorch_lightning.trainer.supporters import CombinedLoader
 
 import torch
 from torch.utils.data import DataLoader
 from pytorchvideo.data import make_clip_sampler
 from pytorchvideo.data.labeled_video_dataset import labeled_video_dataset
 
-from gait_video_dataset import labeled_gait_video_dataset
+from video_dataset import labeled_gait_video_dataset
 
 disease_to_num_mapping_Dict: Dict = {
-    2: {"ASD": 0, "non-ASD": 1},
-    3: {"ASD": 0, "DHS": 1, "LCS_HipOA": 2},
-    4: {"ASD": 0, "DHS": 1, "LCS_HipOA": 2, "normal": 3},
+    4: {"left45_right45": 0, "left45_right90": 1, "left90_right45": 2, "left90_right90": 3},
 }
 
-class WalkDataModule(LightningDataModule):
+class PendulumDataModule(LightningDataModule):
     def __init__(self, opt, dataset_idx: Dict = None):
         super().__init__()
 
-        self._seg_path = opt.data.seg_data_path
-        self._gait_seg_path = opt.data.gait_seg_data_path
-        self.gait_cycle = opt.train.gait_cycle
+        self._data_path = opt.data.data_path
+        self._mapping_index_path = opt.data.index_path
+        self._config_path = opt.data.config_path
 
         # ? 感觉batch size对最后的结果有影响，所以分开使用不同的batch size
         self._gait_cycle_batch_size = opt.data.gait_cycle_batch_size

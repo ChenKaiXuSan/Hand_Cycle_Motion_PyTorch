@@ -34,16 +34,15 @@ from pytorch_lightning.callbacks import (
     LearningRateMonitor,
 )
 
-from dataloader.data_loader import WalkDataModule
+from dataloader.data_loader import PendulumDataModule
 from trainer.train_single import SingleModule
-from trainer.train_late_fusion import LateFusionModule
 from trainer.train_temporal_mix import TemporalMixModule
+from cross_validation import DefineCrossValidation
 
 import hydra
 
 # from cross_validation import DefineCrossValidation
 from helper import save_helper
-
 
 def train(hparams, dataset_idx, fold):
     """the train process for the one fold.
@@ -59,16 +58,14 @@ def train(hparams, dataset_idx, fold):
 
     seed_everything(42, workers=True)
 
-    if hparams.train.experiment == "late_fusion":
-        classification_module = LateFusionModule(hparams)
-    elif "single" in hparams.train.experiment:
+    if "single" in hparams.train.experiment:
         classification_module = SingleModule(hparams)
     elif hparams.train.experiment == "temporal_mix":
         classification_module = TemporalMixModule(hparams)
     else:
         raise ValueError("the experiment is not supported.")
 
-    data_module = WalkDataModule(hparams, dataset_idx)
+    data_module = PendulumDataModule(hparams, dataset_idx)
 
     # for the tensorboard
     tb_logger = TensorBoardLogger(
@@ -140,7 +137,7 @@ def train(hparams, dataset_idx, fold):
 
 @hydra.main(
     version_base=None,
-    config_path="/workspace/skeleton/configs",
+    config_path="/workspace/code/configs",
     config_name="config.yaml",
 )
 def init_params(config):

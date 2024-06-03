@@ -87,7 +87,7 @@ def save_mp4(frames, shape_instance, shape_path, x_list, y_list):
 
     ax.set_aspect('equal')
     ax.set_xlim(-1.5, 1.5)
-    ax.set_ylim(-3, 0)
+    ax.set_ylim(-1.5, 1.5)
 
     line, = ax.plot([], [], lw=5)
     line.set_data([], [])
@@ -189,7 +189,7 @@ def main(params, shape: str, train_flag:str, infos: list, deg):
     # 设置单摆的参数
     # g = 9.81  # 重力加速度 (m/s^2)
     dt = params.dt  # 时间步长
-    save_config = []
+    res_config = []
     left_degree, right_degree = deg
 
     print(f"left_degree: {left_degree}, right_degree: {right_degree}")
@@ -205,7 +205,7 @@ def main(params, shape: str, train_flag:str, infos: list, deg):
         os.makedirs(index_path, exist_ok=True)
 
     if shape == 'circle':
-        circle_config = []
+
         for idx, info in enumerate(infos):
             print(f"shape: {shape}, info: {info}")
             shape_instance = plt.Circle((0, 0), info[0], fc='r')  # 使用圆形表示摆的端点
@@ -218,7 +218,7 @@ def main(params, shape: str, train_flag:str, infos: list, deg):
                 'radius': info[0],
                 'l': l
             }
-            circle_config.append(config)
+            res_config.append(config)
 
             shape_path = os.path.join(path, f"left{left_degree}_right{right_degree}_{shape}_{idx}.mp4")
             shape_index_path = os.path.join(index_path, f"left{left_degree}_right{right_degree}_{shape}_{idx}.json")
@@ -226,7 +226,7 @@ def main(params, shape: str, train_flag:str, infos: list, deg):
             process_one_sample(left_degree, right_degree, l, dt, shape_instance, shape_path, shape_index_path)
 
     elif shape == 'rect':
-        rect_config = []
+
         for idx, info in enumerate(infos):
             print(f"shape: {shape}, info: {info}")
             
@@ -242,7 +242,7 @@ def main(params, shape: str, train_flag:str, infos: list, deg):
                 'height': height,
                 'l': l
             }
-            rect_config.append(config)
+            res_config.append(config)
 
             shape_path = os.path.join(path, f"left{left_degree}_right{right_degree}_{shape}_{idx}.mp4")
             shape_index_path = os.path.join(index_path, f"left{left_degree}_right{right_degree}_{shape}_{idx}.json")
@@ -250,19 +250,15 @@ def main(params, shape: str, train_flag:str, infos: list, deg):
             process_one_sample(left_degree, right_degree, l, dt, shape_instance, shape_path, shape_index_path)
 
     # save config 
-    config_path = os.path.join(f"{params.config_save_path}{train_flag}")
+    # TODO: 这里需要改一下位置，因为单选项的话实例化不了
+    config_path = os.path.join(f"{params.config_save_path}", f"{train_flag}")
     if not os.path.exists(config_path):
         os.makedirs(config_path, exist_ok=True)
-
-    save_config = {
-        'circle': circle_config,
-        'rect': rect_config,
-    }
     
-    with open(os.path.join(config_path, f'{left_degree}_{right_degree}_config.json'), 'w') as f:
-        json.dump(save_config, f, indent=4)
+    with open(os.path.join(config_path, f'left{left_degree}_right{right_degree}_{shape}_config.json'), 'w') as f:
+        json.dump(res_config, f, indent=4)
 
-@hydra.main(config_path='/workspace/code/config', config_name='generate_dataset.yaml')
+@hydra.main(config_path='/workspace/code/configs', config_name='generate_dataset.yaml')
 def init_params(config):
 
     threads = []
