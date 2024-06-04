@@ -26,8 +26,6 @@ from __future__ import annotations
 
 import logging, sys, json
 
-sys.path.append("/workspace/skeleton")
-
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, Type
 
 import torch
@@ -37,256 +35,192 @@ from pytorchvideo.transforms.functional import uniform_temporal_subsample
 
 logger = logging.getLogger(__name__)
 
-def split_gait_cycle(video_tensor: torch.Tensor, gait_cycle_index: list, gait_cycle: int):
-    # 也就是说需要根据给定的参数，能够区分不同的步行周期
-    # 例如， 2分的话，需要能区分前后， 4分的话，需要能区分前后，中间，等
-
-    use_idx = []
-    ans_list = []
-    if gait_cycle == 0 or len(gait_cycle_index) == 2 :
-        for i in range(0, len(gait_cycle_index)-1, 2):
-            ans_list.append(video_tensor[gait_cycle_index[i]:gait_cycle_index[i+1], ...])
-            use_idx.append(gait_cycle_index[i])
-
-    elif gait_cycle == 1:
-    
-        # FIXME: maybe here do not -1 for upper limit.
-        for i in range(1, len(gait_cycle_index)-1, 2):
-            ans_list.append(video_tensor[gait_cycle_index[i]:gait_cycle_index[i+1], ...])
-            use_idx.append(gait_cycle_index[i])
-
-    print(f"used split gait cycle index: {use_idx}")
-    
-    return ans_list, use_idx # needed gait cycle video tensor
+class_to_num_mapping_dict = {
+    "left45_right45": 0,
+    "left45_right90": 1,
+    "left90_right45": 2,
+    "left90_right90": 3,
+}
 
 class TemporalMix(object):
     """
     This class is temporal mix, which is used to mix the first phase and second phase of gait cycle.
-    """    
+    """
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, uniform_temporal_num=16) -> None:
+        self.uniform_temporal_subsample = uniform_temporal_num
 
-    @staticmethod
-    def process_phase(phase_frame: List[torch.Tensor], phase_idx: List[int], bbox: List[torch.Tensor]) -> List[torch.Tensor]:
-        """Crop the human area with bbox, and normalize them with max width.
+    def fuse_frames(
+        self,
+        first_phase: torch.Tensor,
+        second_phase: torch.Tensor,
+    ) -> torch.Tensor:
 
-        Args:
-            phase_frame (List[torch.Tensor]): procedded frame by gait index
-            phase_idx (List[int]): gait cycle index
-            bbox (List[torch.Tensor]): _description_
+        # * fuse the frame with different phase
+        uniform_first_phase = uniform_temporal_subsample(
+            first_phase, self.uniform_temporal_subsample, temporal_dim=-4
+        )  # t, c, h, w
+        uniform_second_phase = uniform_temporal_subsample(
+            second_phase, self.uniform_temporal_subsample, temporal_dim=-4
+        )
 
-        Returns:
-            List[torch.Tensor]: _description_
-        """
-        # find the max width of phase and crop them.
-        cropped_frame_list: List[torch.Tensor] = []
+        # fuse width dim
+        fused_frames = torch.cat([uniform_first_phase, uniform_second_phase], dim=3)
 
-        for i in range(len(phase_idx)):
+        # write the fused frame to png
+        for i in range(fused_frames.size()[0]):
+            write_png(
+                input=fused_frames[i],
+                filename=f"/workspace/code/logs/img/fused{i}.png",
+            )
 
-            one_pack_frames = phase_frame[i] # frame pack
-            one_pack_start_idx = phase_idx[i]
-            b, c, h, w = one_pack_frames.shape # b is one frame pack size
+        return fused_frames
 
-            stored_x_max = float("-inf")
-            stored_xmax = 0
-            stored_xmin = 0
-            
-            one_pack_frames_list: List[torch.Tensor] = []
-
-            # * step1: find the max width and max height for one frame pack.
-            for k in range(b):
-
-                frame_bbox = bbox[one_pack_start_idx+k]
-                x, y, w, h = frame_bbox
-                xmin = int(x - w / 2)
-                xmax = int(x + w / 2)
-
-                if xmax - xmin > stored_x_max:
-                    stored_x_max = xmax - xmin
-                    stored_xmax = xmax
-                    stored_xmin = xmin
-
-            # * step2: crop human area with bbox, and normalized with max width
-            for k in range(b):
-
-                frame_bbox = bbox[i+k]
-                x, y, w, h = frame_bbox
-                
-                frame = one_pack_frames[k]
-                cropped_one_frame_human = frame[:, :, stored_xmin:stored_xmax]
-                one_pack_frames_list.append(cropped_one_frame_human)
-
-                # write_png(input=cropped_one_frame_human, filename=f'/workspace/skeleton/logs/img/test{k}.png')
-
-            # * step3: stack the cropped frame, for next step to fuse them
-            cropped_frame_list.append(torch.stack(one_pack_frames_list, dim=0)) # b, c, h, w
-
-        # shape check 
-        assert len(cropped_frame_list) == len(phase_frame) == len(phase_idx), "frame pack length is not equal"
-        for i in range(len(phase_frame)):
-            assert cropped_frame_list[i].size()[0] == phase_frame[i].size()[0], f"the {i} frame pack size is not equal"
-
-        return cropped_frame_list
-
-    @staticmethod
-    def fuse_frames(processed_first_phase: List[torch.Tensor], processed_second_phase: List[torch.Tensor]) -> torch.Tensor:
-
-        assert len(processed_first_phase) == len(processed_second_phase), "first phase and second phase have different length"
-
-        res_fused_frames: List[torch.Tensor] = []
-        # TODO: fuse the frame with different phase
-        for pack in range(len(processed_first_phase)):
-
-            uniform_first_phase = uniform_temporal_subsample(processed_first_phase[pack], 8, temporal_dim=-4) # t, c, h, w
-            uniform_second_phase = uniform_temporal_subsample(processed_second_phase[pack], 8, temporal_dim=-4)
-
-            # fuse width dim 
-            fused_frames = torch.cat([uniform_first_phase, uniform_second_phase], dim=3)   
-
-            # write the fused frame to png
-            for i in range(fused_frames.size()[0]): 
-                write_png(input=fused_frames[i], filename=f'/workspace/skeleton/logs/img/fused{i}.png')
-
-            res_fused_frames.append(fused_frames)
-            
-        return res_fused_frames
-        
-    def __call__(self, video_tensor: torch.Tensor, gait_cycle_index: list, bbox: List[torch.Tensor]) -> torch.Tensor:
+    def __call__(
+        self,
+        video_tensor: torch.Tensor,
+        left_index: int, 
+        right_index: int,
+    ) -> torch.Tensor:
 
         # * step1: first find the phase frames (pack) and phase index.
-        first_phase, first_phase_idx = split_gait_cycle(video_tensor, gait_cycle_index, 0)
-        second_phase, second_phase_idx = split_gait_cycle(video_tensor, gait_cycle_index, 1)
+        first_phase = video_tensor[:right_index]
+        second_phase = video_tensor[right_index:]
 
-        # check if first phse and second phase have the same length
-        if len(first_phase) > len(second_phase):
-            second_phase.append(second_phase[-1])
-            second_phase_idx.append(second_phase_idx[-1])
-        elif len(first_phase) < len(second_phase):
-            first_phase.append(first_phase[-1])
-            first_phase_idx.append(first_phase_idx[-1])
-            
-        assert len(first_phase) == len(second_phase), "first phase and second phase have different length"
-
-        # * step2: process the phase frame, crop and normalize them
-        processed_first_phase = self.process_phase(first_phase, first_phase_idx, bbox)
-        processed_second_phase = self.process_phase(second_phase, second_phase_idx, bbox)
-
-        # * step3: process on pack, fuse the frame
-        fused_vframes = self.fuse_frames(processed_first_phase, processed_second_phase)
+        # * step2: process on pack, fuse the frame
+        fused_vframes = self.fuse_frames(first_phase, second_phase)
 
         return fused_vframes
+
 
 class LabeledGaitVideoDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         experiment: str,
-        labeled_video_paths: list[Tuple[str, Optional[dict]]],
+        video_path: str,
+        video_index_path: str,
         transform: Optional[Callable[[dict], Any]] = None,
     ) -> None:
         super().__init__()
 
         self._transform = transform
-        self._labeled_videos = labeled_video_paths
         self._experiment = experiment
 
+        self._video_path = video_path
+        self._video_index_path = video_index_path
+
+        self.dataset_dict = self.prepare()
+
         if experiment == "temporal_mix":
-            self._temporal_mix = TemporalMix()
+            uniform_temporal_num = transform.transforms[0]._num_samples
+            self._temporal_mix = TemporalMix(uniform_temporal_num)
         else:
             self._temporal_mix = False
 
-    def move_transform(self, vframes: list[torch.Tensor]) -> None:
+    def prepare(
+        self
+    ):
+
+        res = {}
+
+        idx = 0
+        for class_num in self._video_path.iterdir():
+            for one_video_path in class_num.iterdir():
+                video_name = one_video_path.name
+                mapping_idx = self._video_index_path / video_name.replace(
+                    ".mp4", ".json"
+                )
+                info_dict = {
+                    "video_path": one_video_path,
+                    "video_name": video_name,
+                    "label": class_num.name,
+                    "index": mapping_idx,
+                }
+
+                res[idx] = info_dict
+                idx += 1
+
+        return res
+
+    def move_transform(self, vframes: torch.Tensor) -> None:
 
         if self._transform is not None:
-            video_t_list = []
-            for video_t in vframes:
-                transformed_img = self._transform(video_t.permute(1, 0, 2, 3))
-                video_t_list.append(transformed_img)
-
-            return torch.stack(video_t_list, dim=0) # c, t, h, w
+            transformed_img = self._transform(vframes.permute(1, 0, 2, 3))
+            return transformed_img  # c, t, h, w
         else:
             print("no transform")
-            return torch.stack(vframes, dim=0)
-
+            return vframes.permute(1, 0, 2, 3)  # c, t, h, w
 
     def __len__(self):
-        return len(self._labeled_videos)
+
+        return len(self.dataset_dict.keys())
 
     def __getitem__(self, index) -> Any:
 
-        # load the video tensor from json file
-        with open(self._labeled_videos[index]) as f:
-            file_info_dict = json.load(f)
+        # unpackage video info
+        video_path = self.dataset_dict[index]["video_path"]
+        video_name = self.dataset_dict[index]["video_name"]
+        video_mapping_index_path = self.dataset_dict[index]["index"]
+        video_label = self.dataset_dict[index]["label"]
 
-        # load video info from json file
-        video_name = file_info_dict["video_name"]
-        video_path = file_info_dict["video_path"]
+        with open(video_mapping_index_path, "r") as f:
+            video_mapping = json.load(f)
+
+        left_index = video_mapping["left_index"]
+        right_index = video_mapping["right_index"]
+
         vframes, _, _ = read_video(video_path, output_format="TCHW")
-        label = file_info_dict["label"]
-        disease = file_info_dict["disease"]
-        gait_cycle_index = file_info_dict["gait_cycle_index"]
-        bbox_none_index = file_info_dict["none_index"]
-        bbox = file_info_dict["bbox"]
 
-        print(f"video name: {video_name}, gait cycle index: {gait_cycle_index}")
-
+        # TODO: 还有优化的空间
         if self._experiment == "temporal_mix":
             # should return the new frame, named temporal mix.
-            defined_vframes = self._temporal_mix(vframes, gait_cycle_index, bbox)
+            defined_vframes = self._temporal_mix(vframes, left_index, right_index)
             defined_vframes = self.move_transform(defined_vframes)
 
         elif self._experiment == "late_fusion":
 
-            stance_vframes, used_gait_idx = split_gait_cycle(vframes, gait_cycle_index, 0)
-            swing_vframes, used_gait_idx = split_gait_cycle(vframes, gait_cycle_index, 1)
-
-            # * keep shape 
-            if len(stance_vframes) > len(swing_vframes):
-                stance_vframes = stance_vframes[:len(swing_vframes)]
-            elif len(stance_vframes) < len(swing_vframes):
-                swing_vframes = swing_vframes[:len(stance_vframes)]
+            stance_vframes = vframes[:right_index]
+            swing_vframes = vframes[right_index:]
 
             trans_stance_vframes = self.move_transform(stance_vframes)
             trans_swing_vframes = self.move_transform(swing_vframes)
 
             # * 将不同的phase组合成一个batch返回
-            defined_vframes = torch.stack([trans_stance_vframes, trans_swing_vframes], dim=-1)
+            defined_vframes = torch.stack(
+                [trans_stance_vframes, trans_swing_vframes], dim=-1
+            )
 
         elif "single" in self._experiment:
             if self._experiment == "single_stance":
-                defined_vframes, used_gait_idx = split_gait_cycle(vframes, gait_cycle_index, 0)
+                defined_vframes = vframes[:right_index]
             elif self._experiment == "single_swing":
-                defined_vframes, used_gait_idx = split_gait_cycle(vframes, gait_cycle_index, 1)
-            
+                defined_vframes = vframes[right_index:]
+
             defined_vframes = self.move_transform(defined_vframes)
-                
+
         else:
             raise ValueError("experiment name is not correct")
 
         sample_info_dict = {
             "video": defined_vframes,
-            "label": label,
-            "disease": disease,
+            "label": class_to_num_mapping_dict[video_label],
             "video_name": video_name,
-            "video_index": index,
-            "gait_cycle_index": gait_cycle_index,
-            "bbox_none_index": bbox_none_index,
         }
-        
-        
+
         return sample_info_dict
+
 
 def labeled_gait_video_dataset(
     experiment: str,
     transform: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
     dataset_idx: Dict = None,
+    dataset_index_idx: Dict = None,
 ) -> LabeledGaitVideoDataset:
-    # TODO: 这里应该把late fusion的dataloader的方式改一下，因为目前模型并不能收敛。就很奇怪
-    # TODO: 虽然不是很想改，但是做了很多次试验，late fusion的结果都非常的奇怪。唯一能想到的问题也就是这里的dataloader的问题。stance/swing的周期图像没有匹配上，所以造成这样的结果。
 
     dataset = LabeledGaitVideoDataset(
         experiment=experiment,
-        labeled_video_paths=dataset_idx,
+        video_path=dataset_idx,
+        video_index_path=dataset_index_idx,
         transform=transform,
     )
 

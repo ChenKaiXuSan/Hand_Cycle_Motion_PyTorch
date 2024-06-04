@@ -163,20 +163,16 @@ def random_shape(degree_boundary: list):
     circle_split_index = int(0.2 * len(circle_list))
 
     # rect
-    rect_list = list(itertools.product(random_radius, random_radius, random_stick_length))    
+    random_height = np.linspace(0.1, 0.5, 5)
+    random_width = np.linspace(0.1, 0.5, 5)
+    rect_list = list(itertools.product(random_height, random_width, random_stick_length))    
     np.random.shuffle(rect_list)
 
     rect_split_index = int(0.2 * len(rect_list))
 
     shape_info = {
-        'circle': {
-            'train': circle_list[circle_split_index:],
-            'val': circle_list[:circle_split_index]
-        },
-        'rect': {
-            'train': rect_list[rect_split_index:],
-            'val': rect_list[:rect_split_index]
-        }
+        'circle': circle_list,
+        'rect': rect_list
     }
 
     # 非对称的运动方程
@@ -184,7 +180,7 @@ def random_shape(degree_boundary: list):
     
     return shape_info, degree
 
-def main(params, shape: str, train_flag:str, infos: list, deg):
+def main(params, shape: str, infos: list, deg):
 
     # 设置单摆的参数
     # g = 9.81  # 重力加速度 (m/s^2)
@@ -195,12 +191,12 @@ def main(params, shape: str, train_flag:str, infos: list, deg):
     print(f"left_degree: {left_degree}, right_degree: {right_degree}")
 
     # 保存动画到文件
-    path = os.path.join(f"{params.save_path}", f"{train_flag}", f"left{left_degree}_right{right_degree}")
+    path = os.path.join(f"{params.save_path}", shape, f"left{left_degree}_right{right_degree}")
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
 
     # 保存index，作为融合的索引
-    index_path = os.path.join(f"{params.save_index_path}", f"{train_flag}")
+    index_path = os.path.join(f"{params.save_index_path}", shape)
     if not os.path.exists(index_path):
         os.makedirs(index_path, exist_ok=True)
 
@@ -251,7 +247,7 @@ def main(params, shape: str, train_flag:str, infos: list, deg):
 
     # save config 
     # TODO: 这里需要改一下位置，因为单选项的话实例化不了
-    config_path = os.path.join(f"{params.config_save_path}", f"{train_flag}")
+    config_path = os.path.join(f"{params.config_save_path}")
     if not os.path.exists(config_path):
         os.makedirs(config_path, exist_ok=True)
     
@@ -266,12 +262,11 @@ def init_params(config):
     random_index, degree = random_shape(config.degree_boundary)
 
     # * 这里为了处理多线程，加快生成速度
-    for shape, train_val_info in random_index.items():
-        for v, shape_info in train_val_info.items():
-            for deg in degree:
-                # main(config, shape, v, shape_info, deg) # only for test
-                multi_process = multiprocessing.Process(target=main, args=(config, shape, v, shape_info, deg))
-                threads.append(multi_process)
+    for shape, shape_info in random_index.items():
+        for deg in degree:
+            # main(config, shape, v, shape_info, deg) # only for test
+            multi_process = multiprocessing.Process(target=main, args=(config, shape, shape_info, deg))
+            threads.append(multi_process)
 
     for t in threads:
         t.start()

@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Tuple
 from imblearn.over_sampling import RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
 
-from sklearn.model_selection import StratifiedGroupKFold, train_test_split, GroupKFold, KFold
+from sklearn.model_selection import KFold
 from pathlib import Path
 
 # * this used for loading the mapping info.
@@ -49,10 +49,11 @@ class DefineCrossValidation(object):
         
         self.video_path: Path = Path(config.data.data_path)
         self.index_path: Path = Path(config.data.index_path)
-        # self.gait_seg_idx_path: Path = Path(config.data.gait_seg_index_data_path) # used for training path mapping
+        self.root_path: Path = self.video_path.parent.parent
 
         self.K: int = config.train.fold
         # self.sampler: str = config.data.sampling # data balance, [over, under, none]
+        self.val_ratio: float = config.data.val_ratio
 
         self.class_num: int = config.model.model_class_num
 
@@ -84,76 +85,31 @@ class DefineCrossValidation(object):
 
         return train_mapped_path, val_mapped_path
 
-    def process_cross_validation(self, video_dict: dict) -> Tuple[List, List, List]:
+    def make_dataset_with_video(self, dataset_idx: list, fold: int, flag: str, X: list, y: list):
 
-        _path = video_dict
+        target_path = self.video_path.parent.parent / f"fold{fold}" / 'data' / flag
+        target_index_path = self.index_path.parent.parent / f"fold{fold}" / 'index_mapping' / flag
 
-        X = []  # patient index
-        y = []  # patient class index
-        groups = []  # different patient groups
+        for i in dataset_idx:
+            video_path = X[i] 
+            video_label = y[i]
+            class_type = str(video_path).split("/")[-2]
 
-        disease_to_num = {disease: idx for idx, disease in class_num_mapping_Dict[self.class_num].items()}
-        element_to_num = {}
+            index_path = '/'.join(str(video_path).split('/')[:-4]) + '/index_mapping/' + str(video_path).split('/')[6] + '/' + str(video_path).split('/')[-1].replace('mp4', 'json')
 
-        name_map = set()
+            _t_path = target_path / class_type 
+            _t_index_path = target_index_path 
+            
+            if not _t_path.exists():
+                _t_path.mkdir(parents=True)
 
-        # process one disease in one loop.
-        for disease, path in _path.items():
-            patient_list = sorted(list(path))
+            if not _t_index_path.exists():
+                _t_index_path.mkdir(parents=True)
 
-            for p in patient_list:
-                name, _ = p.name.split("-")
-                #  FIXME: 我觉得HipOA是造成数据不平衡的原因，所以我把HipOA的数据去掉了
-                if 'HipOA' not in name:
-                    name_map.add(name)
+            shutil.copy(video_path, _t_path / video_path.name)
+            shutil.copy(index_path, _t_index_path / Path(video_path.name.split('.')[0] +".json"))
 
-        for idx, element in enumerate(name_map):
-            element_to_num[element] = idx
-        
-        for disease, path in _path.items():
-            patient_list = sorted(list(path))
-            for i in range(len(patient_list)):
-
-                name, _ = patient_list[i].name.split("-")
-                
-                label = disease_to_num[disease]
-
-                # FIXME: 我举得HipOA是造成数据不平衡的原因，所以我把HipOA的数据去掉了
-                if 'HipOA' not in name:
-                    X.append(patient_list[i])  # true path in Path
-                    y.append(label)  # label, 0, 1, 2
-                    groups.append(element_to_num[name])  # number of different patient
-
-        return X, y, groups
-
-    def make_dataset_with_video(self, val_dataset_idx: list, fold: int, flag: str):
-        temp_path = self.gait_seg_idx_path / str(self.class_num) / self.sampler / str(fold) / str(flag)
-        val_idx = val_dataset_idx
-
-        _class_map = class_num_mapping_Dict[self.class_num]
-        _disease_to_num = {disease: idx for idx, disease in _class_map.items()}
-
-        shutil.rmtree(temp_path, ignore_errors=True)
-
-        for path in val_idx:
-            with open(path) as f:
-                file_info_dict = json.load(f)
-
-            video_name = file_info_dict["video_name"]
-            video_path = file_info_dict["video_path"]
-            video_disease = file_info_dict["disease"]
-
-            if video_disease not in _disease_to_num.keys():
-                video_disease = "non-ASD"
-
-            if not (temp_path / video_disease).exists():
-                (temp_path / video_disease).mkdir(parents=True, exist_ok=False)
-
-            shutil.copy(
-                video_path, temp_path / video_disease / (video_name + ".mp4")
-            )
-
-        return temp_path
+        print(f"fold {fold} {flag} dataset has been created.")        
 
     @staticmethod
     def magic_move(train_mapped_path, val_mapped_path):
@@ -189,24 +145,30 @@ class DefineCrossValidation(object):
 
         return new_train_mapped_path, new_val_mapped_path
     
-    @staticmethod
-    def map_class_num(class_num: int, raw_video_path: Path) -> Dict:
+    def get_total_dataset(self, class_num: int, raw_video_path: Path) -> Dict:
 
-        _class_num = class_num_mapping_Dict[class_num]
+        # TODO: 这里看上去有问题，但应该是灭有问题的。明天再确认一下
+        res_dict = {}
+        for shape in raw_video_path.iterdir():
+            for one_class in shape.iterdir():
+                res_dict[one_class.name] = []
+        
+        # 创建逆向字典
+        inverse_dict = {v: k for k, v in enumerate(res_dict.keys())}
 
-        res_dict = {v:[] for k,v in _class_num.items()}
+        X, y = [], []
 
-        for train_flag in raw_video_path.iterdir():
+        for shape in raw_video_path.iterdir():
+            for one_class in shape.iterdir():
 
-            for one_class in train_flag.iterdir():
-                
-                for one_video in one_class.iterdir():
-                    res_dict[one_class.name].append(one_video)
-        # TODO: 这里按照类别统计了所有的video。但是在cross validation的时候，是需要按照一个类别来划分的吗
-        # TODO：划分的时候按照X，y组成一个pair就行了，不需要按照类别来划分。也就是说需要把他们都组合起来。
-        # 但是需要前提确保不同类别中的顺序是保持的才行。
-        return res_dict
+                one_class_list = list(one_class.iterdir())
 
+                for i in one_class_list:
+                    X.append(i)
+                    class_type = '_'.join(i.name.split("_")[:2])
+                    y.append(inverse_dict[class_type])
+
+        return X, y
 
     def prepare(self):
         """define cross validation first, with the K.
@@ -222,83 +184,65 @@ class DefineCrossValidation(object):
         """
         K = self.K
 
-        ans_fold = {}
-
-        mapped_class_Dict = self.map_class_num(self.class_num, self.video_path)
-
+        X, y = self.get_total_dataset(self.class_num, self.video_path)
+        
         # define the cross validation
         # X: video path, in path.Path foramt. len = 1954
         # y: label, in list format. len = 1954, type defined by class_num_mapping_Dict.
         # groups: different patient, in list format. It means unique patient index. [54]
-        X, y, groups = self.process_cross_validation(mapped_class_Dict)
+        # X, y, groups = self.process_cross_validation(total_dataset)
 
-        sgkf = StratifiedGroupKFold(n_splits=K)
+        # sgkf = StratifiedGroupKFold(n_splits=K)
+        kfold = KFold(n_splits=K, shuffle=True, random_state=42)
 
         for i, (train_index, test_index) in enumerate(
-            sgkf.split(X=X, y=y, groups=groups)
+            kfold.split(X=X, y=y)
         ):
-            if self.sampler in ["over", "under"]:
-                if self.sampler == "over":
-                    ros = RandomOverSampler(random_state=42)
-                elif self.sampler == "under":
-                    ros = RandomUnderSampler(random_state=42)
+            # if self.sampler in ["over", "under"]:
+            #     if self.sampler == "over":
+            #         ros = RandomOverSampler(random_state=42)
+            #     elif self.sampler == "under":
+            #         ros = RandomUnderSampler(random_state=42)
 
-                train_mapped_path, val_mapped_path = self.random_sampler(
-                    X, y, train_index, test_index, ros
-                )
+            #     train_mapped_path, val_mapped_path = self.random_sampler(
+            #         X, y, train_index, test_index, ros
+            #     )
 
-            else:
-                train_mapped_path = [X[i] for i in train_index]
-                val_mapped_path = [X[i] for i in test_index]
+            # else:
+            #     train_mapped_path = [X[i] for i in train_index]
+            #     val_mapped_path = [X[i] for i in test_index]
 
             # FIXME: magic move 
-            train_mapped_path, val_mapped_path = self.magic_move(train_mapped_path, val_mapped_path)
+            # train_mapped_path, val_mapped_path = self.magic_move(train_mapped_path, val_mapped_path)
 
             # make the val data path
-            train_video_path = self.make_dataset_with_video(train_mapped_path, i, "train")
-            val_video_path = self.make_dataset_with_video(val_mapped_path, i, "val")
-
-            # * here used for gait labeled method, or load video from path
-            ans_fold[i] = [train_mapped_path, val_mapped_path, train_video_path, val_video_path]
-
-        return ans_fold, X, y, groups
+            self.make_dataset_with_video(train_index, i, "train", X, y)
+            self.make_dataset_with_video(test_index, i, "val", X, y)
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
-
-        target_path = self.video_path
-        index_path = self.index_path
-
-        # * when json file changed, need to reprocess the dataset.
-        if os.path.exists(target_path):
-            
+        
+        flag = False
+        for i in range(self.K):
+            t_path = self.root_path / f"fold{i}"
+            if t_path.exists(): continue;
+            else: 
+                flag = True
+                break;
+        
+        if flag:
+        
             # * step 1: get total data
-            fold_dataset_idx, *_ = self.prepare()
+            self.prepare()
 
-            json_fold_dataset_idx = copy.deepcopy(fold_dataset_idx)
+        # * step 2: get the data path    
+        res_dict = {}
 
-            for k, v in fold_dataset_idx.items():
-                
-                # train mapping path, include the gait cycle index
-                train_mapping_idx = v[0]
-                json_fold_dataset_idx[k][0] = [str(i) for i in train_mapping_idx]
-
-                val_mapping_idx = v[1]
-                json_fold_dataset_idx[k][1] = [str(i) for i in val_mapping_idx]
-
-                # train video path
-                train_video_idx = v[2]
-                json_fold_dataset_idx[k][2] = str(train_video_idx)
-
-                # val video path
-                val_dataset_idx = v[3]
-                json_fold_dataset_idx[k][3] = str(val_dataset_idx)
-
-            with open((self.gait_seg_idx_path / str(self.class_num) / self.sampler / "index.json"), "w") as f:
-                json.dump(json_fold_dataset_idx, f, sort_keys=True, indent=4)
-                
-        else:
-            raise ValueError(
-                "the gait seg idx path is not exist, please check the path."
-            )
-
-        return fold_dataset_idx
+        for k in range(self.K):
+            res_dict[f"fold{k}"] = {
+                "train": self.root_path / f"fold{k}" / 'data' / "train",
+                "val": self.root_path / f"fold{k}" / 'data' / "val",
+                "train_index": self.root_path / f"fold{k}" / 'index_mapping' / "train",
+                "val_index": self.root_path / f"fold{k}" / 'index_mapping' / "val",
+            }
+        
+        return res_dict

@@ -37,6 +37,7 @@ from pytorch_lightning.callbacks import (
 from dataloader.data_loader import PendulumDataModule
 from trainer.train_single import SingleModule
 from trainer.train_temporal_mix import TemporalMixModule
+from trainer.train_late_fusion import LateFusionModule
 from cross_validation import DefineCrossValidation
 
 import hydra
@@ -62,6 +63,8 @@ def train(hparams, dataset_idx, fold):
         classification_module = SingleModule(hparams)
     elif hparams.train.experiment == "temporal_mix":
         classification_module = TemporalMixModule(hparams)
+    elif hparams.train.experiment == "late_fusion":
+        classification_module = LateFusionModule(hparams)
     else:
         raise ValueError("the experiment is not supported.")
 
