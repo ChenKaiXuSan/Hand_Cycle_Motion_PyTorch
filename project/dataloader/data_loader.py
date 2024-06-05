@@ -71,6 +71,7 @@ class PendulumDataModule(LightningDataModule):
         # * this is the dataset idx, which include the train/val dataset idx.
         self._dataset_idx = dataset_idx
         self._class_num = opt.model.model_class_num
+        self._class_to_num = opt.data.class_to_num
 
         self._experiment = opt.train.experiment
 
@@ -144,6 +145,7 @@ class PendulumDataModule(LightningDataModule):
                 ],  # train mapped path, include gait cycle index.
                 dataset_index_idx=self._dataset_idx["train_index"],
                 transform=self.mapping_transform,
+                class_to_num=self._class_to_num,
             )
 
             # val dataset, test dataset
@@ -154,6 +156,7 @@ class PendulumDataModule(LightningDataModule):
                 ],  # val mapped path, include gait cycle index.
                 dataset_index_idx=self._dataset_idx["val_index"],
                 transform=self.mapping_transform,
+                class_to_num=self._class_to_num,
             )
 
         elif "single" in self._experiment:
@@ -174,6 +177,7 @@ class PendulumDataModule(LightningDataModule):
                     ],  # train mapped path, include gait cycle index.
                     dataset_index_idx=self._dataset_idx["train_index"],
                     transform=self.mapping_transform,
+                    class_to_num=self._class_to_num,
                 )
 
             # val dataset, test dataset
@@ -193,6 +197,7 @@ class PendulumDataModule(LightningDataModule):
                 ],  # train mapped path, include gait cycle index.
                 dataset_index_idx=self._dataset_idx["train_index"],
                 transform=self.mapping_transform,
+                class_to_num=self._class_to_num,
             )
 
             # val dataset, test dataset
@@ -203,6 +208,7 @@ class PendulumDataModule(LightningDataModule):
                 ],  # val mapped path, include gait cycle index.
                 dataset_index_idx=self._dataset_idx["val_index"],
                 transform=self.mapping_transform,
+                class_to_num=self._class_to_num,
             )
 
         else:

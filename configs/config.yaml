@@ -9,21 +9,22 @@ optimizer:
   beta2: 0.999
 
 data:
-  data_path: /workspace/data/pendulum_bak/raw/data/
-  index_path: /workspace/data/pendulum_bak/raw/index_mapping/
-  config_path: /workspace/data/pendulum_bak/config/
+  data_path: /workspace/data/pendulum/raw/data/
+  index_path: /workspace/data/pendulum/raw/index_mapping/
+  config_path: /workspace/data/pendulum/config/
   # temp_save_fig_path: /workspace/data/pendulum/temp_fig/
+  class_to_num: /workspace/data/pendulum/class_to_num.json  # the class to num mapping
 
   num_workers: 4
   img_size: 224
   # sampling: "over" # over, under, none
 
-  batch_size: 32  # this used for default method, without gait cycle defined method.
+  batch_size: 16  # this used for default method, without gait cycle defined method.
   val_ratio: 0.2
 
 model:
   model: "resnet"   
-  model_class_num: 4 
+  model_class_num: 9
   model_depth: 50 # choices=[50, 101, 152], help='the depth of used model'
 
 train:
@@ -31,7 +32,7 @@ train:
   max_epochs: 50 # numer of epochs of training
 
   # used for val 
-  clip_duration: 0.5 # clip duration for the video
+  clip_duration: 1 # clip duration for the video
   uniform_temporal_subsample_num: 16 # num frame from the clip duration, f or define one gait cycle, we need use whole frames.
 
   experiment: temporal_mix # temporal_mix, single_stance, single_swing, single_random, late_fusion

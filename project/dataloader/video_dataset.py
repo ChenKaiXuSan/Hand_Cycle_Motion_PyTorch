@@ -35,13 +35,6 @@ from pytorchvideo.transforms.functional import uniform_temporal_subsample
 
 logger = logging.getLogger(__name__)
 
-class_to_num_mapping_dict = {
-    "left45_right45": 0,
-    "left45_right90": 1,
-    "left90_right45": 2,
-    "left90_right90": 3,
-}
-
 class TemporalMix(object):
     """
     This class is temporal mix, which is used to mix the first phase and second phase of gait cycle.
@@ -99,6 +92,7 @@ class LabeledGaitVideoDataset(torch.utils.data.Dataset):
         experiment: str,
         video_path: str,
         video_index_path: str,
+        class_to_num: str,
         transform: Optional[Callable[[dict], Any]] = None,
     ) -> None:
         super().__init__()
@@ -116,6 +110,9 @@ class LabeledGaitVideoDataset(torch.utils.data.Dataset):
             self._temporal_mix = TemporalMix(uniform_temporal_num)
         else:
             self._temporal_mix = False
+
+        with open(class_to_num, "r") as f:
+            self.class_to_num_mapping_dict = json.load(f)
 
     def prepare(
         self
@@ -203,7 +200,7 @@ class LabeledGaitVideoDataset(torch.utils.data.Dataset):
 
         sample_info_dict = {
             "video": defined_vframes,
-            "label": class_to_num_mapping_dict[video_label],
+            "label": self.class_to_num_mapping_dict[video_label],
             "video_name": video_name,
         }
 
@@ -215,6 +212,7 @@ def labeled_gait_video_dataset(
     transform: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
     dataset_idx: Dict = None,
     dataset_index_idx: Dict = None,
+    class_to_num: str = None,
 ) -> LabeledGaitVideoDataset:
 
     dataset = LabeledGaitVideoDataset(
@@ -222,6 +220,7 @@ def labeled_gait_video_dataset(
         video_path=dataset_idx,
         video_index_path=dataset_index_idx,
         transform=transform,
+        class_to_num=class_to_num,
     )
 
     return dataset

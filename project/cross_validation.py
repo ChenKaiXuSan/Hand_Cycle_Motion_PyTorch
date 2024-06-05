@@ -20,7 +20,7 @@ Date      	By	Comments
 ----------	---	---------------------------------------------------------
 '''
 
-import os, json, shutil, copy, random
+import os, json, shutil, copy, random, re
 from typing import Any, Dict, List, Tuple
 
 from imblearn.over_sampling import RandomOverSampler
@@ -28,16 +28,6 @@ from imblearn.under_sampling import RandomUnderSampler
 
 from sklearn.model_selection import KFold
 from pathlib import Path
-
-# * this used for loading the mapping info.
-class_num_mapping_Dict: Dict = {
-    4: {
-        0: "left45_right45",
-        1: "left45_right90",
-        2: "left90_right45",
-        3: "left90_right90",
-    }
-}
 
 class DefineCrossValidation(object):
     """process:
@@ -85,7 +75,7 @@ class DefineCrossValidation(object):
 
         return train_mapped_path, val_mapped_path
 
-    def make_dataset_with_video(self, dataset_idx: list, fold: int, flag: str, X: list, y: list):
+    def make_dataset_with_video(self, dataset_idx: list, fold: int, flag: str, X: list, y: list, shape):
 
         target_path = self.video_path.parent.parent / f"fold{fold}" / 'data' / flag
         target_index_path = self.index_path.parent.parent / f"fold{fold}" / 'index_mapping' / flag
@@ -109,7 +99,7 @@ class DefineCrossValidation(object):
             shutil.copy(video_path, _t_path / video_path.name)
             shutil.copy(index_path, _t_index_path / Path(video_path.name.split('.')[0] +".json"))
 
-        print(f"fold {fold} {flag} dataset has been created.")        
+        print(f"fold {fold} shape {shape} {flag} dataset has been created.")        
 
     @staticmethod
     def magic_move(train_mapped_path, val_mapped_path):
@@ -147,18 +137,30 @@ class DefineCrossValidation(object):
     
     def get_total_dataset(self, class_num: int, raw_video_path: Path) -> Dict:
 
-        # TODO: 这里看上去有问题，但应该是灭有问题的。明天再确认一下
         res_dict = {}
         for shape in raw_video_path.iterdir():
             for one_class in shape.iterdir():
                 res_dict[one_class.name] = []
         
-        # 创建逆向字典
-        inverse_dict = {v: k for k, v in enumerate(res_dict.keys())}
+        # make inverse dict
+        str_list = res_dict.keys()
+        def extract_numbers(s):
+            left, right = re.findall(r'\d+', s)
+            return int(left), int(right)
+        
+        inverse_dict = sorted(str_list, key=extract_numbers)
+        inverse_dict = {v: k for k, v in enumerate(inverse_dict)}
 
-        X, y = [], []
+        # save inverse dict 
+        with open(self.root_path / 'class_to_num.json', 'w') as f:
+            json.dump(inverse_dict, f, indent=4)
+
+        final_dict = {}
 
         for shape in raw_video_path.iterdir():
+
+            X, y = [], []
+
             for one_class in shape.iterdir():
 
                 one_class_list = list(one_class.iterdir())
@@ -168,7 +170,9 @@ class DefineCrossValidation(object):
                     class_type = '_'.join(i.name.split("_")[:2])
                     y.append(inverse_dict[class_type])
 
-        return X, y
+            final_dict[shape.name] = [X, y]
+
+        return final_dict
 
     def prepare(self):
         """define cross validation first, with the K.
@@ -184,7 +188,7 @@ class DefineCrossValidation(object):
         """
         K = self.K
 
-        X, y = self.get_total_dataset(self.class_num, self.video_path)
+        total_shape_dict = self.get_total_dataset(self.class_num, self.video_path)
         
         # define the cross validation
         # X: video path, in path.Path foramt. len = 1954
@@ -195,29 +199,12 @@ class DefineCrossValidation(object):
         # sgkf = StratifiedGroupKFold(n_splits=K)
         kfold = KFold(n_splits=K, shuffle=True, random_state=42)
 
-        for i, (train_index, test_index) in enumerate(
-            kfold.split(X=X, y=y)
-        ):
-            # if self.sampler in ["over", "under"]:
-            #     if self.sampler == "over":
-            #         ros = RandomOverSampler(random_state=42)
-            #     elif self.sampler == "under":
-            #         ros = RandomUnderSampler(random_state=42)
+        for shape, [X, y] in total_shape_dict.items():
+            circle_kfold = list(kfold.split(X=X, y=y))
 
-            #     train_mapped_path, val_mapped_path = self.random_sampler(
-            #         X, y, train_index, test_index, ros
-            #     )
-
-            # else:
-            #     train_mapped_path = [X[i] for i in train_index]
-            #     val_mapped_path = [X[i] for i in test_index]
-
-            # FIXME: magic move 
-            # train_mapped_path, val_mapped_path = self.magic_move(train_mapped_path, val_mapped_path)
-
-            # make the val data path
-            self.make_dataset_with_video(train_index, i, "train", X, y)
-            self.make_dataset_with_video(test_index, i, "val", X, y)
+            for f in range(K):
+                self.make_dataset_with_video(circle_kfold[f][0], f, "train", X, y, shape)
+                self.make_dataset_with_video(circle_kfold[f][1], f, "val", X, y, shape)
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         
