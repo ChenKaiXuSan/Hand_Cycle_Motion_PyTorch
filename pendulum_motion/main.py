@@ -84,11 +84,16 @@ def save_mp4(frames, shape_instance, shape_path, x_list, y_list):
     # 创建动画
     fig, ax = plt.subplots()
     plt.axis('off')
-    fig.set_size_inches(5.2, 5.2)
 
+    # fig setting
+    fig.set_size_inches(5.2, 5.2)
+    fig.patch.set_facecolor('black')
+
+    # ax setting
     ax.set_aspect('equal')
     ax.set_xlim(-1.5, 1.5)
     ax.set_ylim(-1.5, 1.5)
+    ax.set_facecolor('black')
 
     line, = ax.plot([], [], lw=5)
     line.set_data([], [])
@@ -188,16 +193,21 @@ def main(params, shape: str, infos: list, deg):
     dt = params.dt  # 时间步长
     res_config = []
     left_degree, right_degree = deg
-
     print(f"left_degree: {left_degree}, right_degree: {right_degree}")
 
+    background = params.background
+    root_path = params.save_root_path
+    save_path = Path(root_path.replace('pendulum', f"pendulum_{background}")) / "raw/data"
+    save_index_path = Path(root_path.replace('pendulum', f"pendulum_{background}")) / "raw/index_mapping"
+    config_save_path = Path(root_path.replace('pendulum', f"pendulum_config_{background}")) / "config"
+
     # 保存动画到文件
-    path = os.path.join(f"{params.save_path}", shape, f"left{left_degree}_right{right_degree}")
+    path = os.path.join(f"{save_path}", shape, f"left{left_degree}_right{right_degree}")
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
 
     # 保存index，作为融合的索引
-    index_path = os.path.join(f"{params.save_index_path}", shape)
+    index_path = os.path.join(f"{save_index_path}", shape)
     if not os.path.exists(index_path):
         os.makedirs(index_path, exist_ok=True)
 
@@ -247,8 +257,7 @@ def main(params, shape: str, infos: list, deg):
             process_one_sample(left_degree, right_degree, l, dt, shape_instance, shape_path, shape_index_path)
 
     # save config 
-    # TODO: 这里需要改一下位置，因为单选项的话实例化不了
-    config_path = os.path.join(f"{params.config_save_path}")
+    config_path = os.path.join(f"{config_save_path}")
     if not os.path.exists(config_path):
         os.makedirs(config_path, exist_ok=True)
     
