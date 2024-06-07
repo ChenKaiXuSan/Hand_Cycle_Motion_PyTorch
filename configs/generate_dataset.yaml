@@ -16,4 +16,4 @@ temp_save_fig_path: /workspace/data/pendulum/temp_fig/
 shape: ['circle', 'rect']
 degree_boundary: [135, 90, 45]
 
-background: black # ['white', 'black']
+background: black # ['white', 'black', 'none']

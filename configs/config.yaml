@@ -9,7 +9,7 @@ optimizer:
   beta2: 0.999
 
 data:
-  background: balck # ['white', 'black']
+  background: black # ['white', 'black', 'non']
   data_path: /workspace/data/pendulum_${data.background}/raw/data/
   index_path: /workspace/data/pendulum_${data.background}/raw/index_mapping/
   config_path: /workspace/data/pendulum_${data.background}/config/
