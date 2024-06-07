@@ -81,11 +81,12 @@ def save_inference_late_fusion(config, model, dataloader, fold):
         preds_softmax = torch.softmax(predict, dim=1)
 
         # * Since saving the video tensor is too GPU memory intensive, the content is extracted in a batch to be saved
+        # FIXME: numpy.core._exceptions._ArrayMemoryError
         random_index = random.sample(range(0, stance_video.size()[0]), 2)
-        save_CAM(
-            config, stance_cnn, stance_video, label, fold, "stance", i, random_index
-        )
-        save_CAM(config, swing_cnn, swing_video, label, fold, "swing", i, random_index)
+        # save_CAM(
+        #     config, stance_cnn, stance_video, label, fold, "stance", i, random_index
+        # )
+        # save_CAM(config, swing_cnn, swing_video, label, fold, "swing", i, random_index)
 
         for i in preds_softmax.tolist():
             total_pred_list.append(i)
@@ -103,15 +104,15 @@ def save_inference_late_fusion(config, model, dataloader, fold):
 
     torch.save(
         pred,
-        save_path / f"{config.model.model}_{config.data.sampling}_{fold}_pred.pt",
+        save_path / f"{config.model.model}_{fold}_pred.pt",
     )
     torch.save(
         label,
-        save_path / f"{config.model.model}_{config.data.sampling}_{fold}_label.pt",
+        save_path / f"{config.model.model}_{fold}_label.pt",
     )
 
     logging.info(
-        f"save the pred and label into {save_path}/{config.model.model}_{config.data.sampling}_{fold}"
+        f"save the pred and label into {save_path}/{config.model.model}_{fold}"
     )
 
     return pred, label
