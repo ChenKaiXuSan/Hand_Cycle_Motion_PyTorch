@@ -123,16 +123,23 @@ def train(hparams, dataset_idx, fold):
     trainer.test(
         classification_module,
         data_module,
-        # ) 
-        ckpt_path="best",
+        # ckpt_path="best",
     )
+
+    if "single" in hparams.train.experiment:
+        classification_module = SingleModule.load_from_checkpoint(trainer.checkpoint_callback.best_model_path)
+        # classification_module = SingleModule.load_from_checkpoint('/workspace/code/logs/single_stance/resnet/2024-06-05/9/14-16-47/fold0/version_0/checkpoints/0-2.20-0.1355.ckpt')
+    elif hparams.train.experiment == "temporal_mix":
+        classification_module = TemporalMixModule.load_from_checkpoint(trainer.checkpoint_callback.best_model_path)
+    elif hparams.train.experiment == "late_fusion":
+        classification_module = LateFusionModule.load_from_checkpoint(trainer.checkpoint_callback.best_model_path)
+    else:
+        raise ValueError("the experiment is not supported.")
 
     # save_helper(hparams, classification_module, data_module, fold) #! debug only
     save_helper(
         hparams,
-        classification_module.load_from_checkpoint(
-            trainer.checkpoint_callback.best_model_path
-        ),
+        classification_module,
         data_module,
         fold,
     )

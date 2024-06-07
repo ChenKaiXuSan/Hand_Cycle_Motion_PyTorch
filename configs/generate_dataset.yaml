@@ -3,7 +3,7 @@ hydra:
   run:
     dir: /workspace/code/logs/prepare_dataset/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
-dt: 0.3 # time interval
+dt: 1 # time interval
 
 # path
 save_path: /workspace/data/pendulum/raw/data/

@@ -27,6 +27,7 @@ import cv2, os, json
 import itertools
 import multiprocessing
 import hydra
+from pathlib import Path
 
 def one_cycle(max_left_theta, max_right_theta, L, dt):
 
@@ -273,6 +274,16 @@ def init_params(config):
     
     for t in threads:
         t.join()
+
+    # finish file check 
+    print('*' * 50)
+    data_path = Path(config.save_path)
+    data_list = list(data_path.glob('**/*.mp4'))
+    print(f"Total {len(data_list)} files generated!")
+    # shape check
+    for shape in data_path.iterdir():
+        print(f"shape: {shape.name}, total: {len(list(shape.glob('*.mp4')))}")
+    print('*' * 50)
 
 if '__main__' == __name__:
 

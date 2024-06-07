@@ -225,7 +225,7 @@ class DefineCrossValidation(object):
         res_dict = {}
 
         for k in range(self.K):
-            res_dict[f"fold{k}"] = {
+            res_dict[k] = {
                 "train": self.root_path / f"fold{k}" / 'data' / "train",
                 "val": self.root_path / f"fold{k}" / 'data' / "val",
                 "train_index": self.root_path / f"fold{k}" / 'index_mapping' / "train",
