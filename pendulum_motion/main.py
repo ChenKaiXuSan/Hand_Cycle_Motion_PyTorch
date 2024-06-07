@@ -286,11 +286,12 @@ def init_params(config):
 
     # finish file check 
     print('*' * 50)
-    data_path = Path(config.save_path)
-    data_list = list(data_path.glob('**/*.mp4'))
+    root_path = config.save_root_path
+    save_path = Path(root_path.replace('pendulum', f"pendulum_{config.background}")) / "raw/data"
+    data_list = list(save_path.glob('**/*.mp4'))
     print(f"Total {len(data_list)} files generated!")
     # shape check
-    for shape in data_path.iterdir():
+    for shape in save_path.iterdir():
         print(f"shape: {shape.name}, total: {len(list(shape.glob('*.mp4')))}")
     print('*' * 50)
 
