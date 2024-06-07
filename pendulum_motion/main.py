@@ -79,16 +79,29 @@ def save_index(x_list, file_path):
     with open(file_path, 'w') as f:
         json.dump(json_info, f, indent=4)
 
-def save_mp4(frames, shape_instance, shape_path, x_list, y_list):
+def save_mp4(frames, shape_instance, shape_path, x_list, y_list, background: str = 'black'):
 
     # 创建动画
     fig, ax = plt.subplots()
     plt.axis('off')
+
+    # fig setting
     fig.set_size_inches(5.2, 5.2)
 
+    # ax setting
     ax.set_aspect('equal')
     ax.set_xlim(-1.5, 1.5)
     ax.set_ylim(-1.5, 1.5)
+
+    transparent_flag = False
+    if background == 'black':
+        fig.patch.set_facecolor('black')
+        ax.set_facecolor('black')
+    elif background == 'white':
+        fig.patch.set_facecolor('white')
+        ax.set_facecolor('white')
+    elif background == 'none':
+        transparent_flag = True
 
     line, = ax.plot([], [], lw=5)
     line.set_data([], [])
@@ -120,7 +133,7 @@ def save_mp4(frames, shape_instance, shape_path, x_list, y_list):
         
         # 先把plt的图片写入到内存，然后用cv2读出来保存成视频。我找不到什么好的转化方法了
         temp_save_path = os.path.join('/workspace', f'{train_flag}_{shape}_{left_right}_temp.png')
-        fig.savefig(temp_save_path, bbox_inches='tight', pad_inches=0)
+        fig.savefig(temp_save_path, bbox_inches='tight', pad_inches=0, transparent=transparent_flag)
         image = cv2.imread(temp_save_path)
 
         # image = np.frombuffer(fig.canvas.tostring_rgb(), dtype='uint8')
@@ -133,7 +146,7 @@ def save_mp4(frames, shape_instance, shape_path, x_list, y_list):
     plt.close(fig)
     print(f"save {shape_path} done!")
 
-def process_one_sample(left_degree, right_degree, L, dt, shape_value, shape_path, shape_index_path):   
+def process_one_sample(left_degree, right_degree, L, dt, shape_value, shape_path, shape_index_path, background: str = 'black'):   
 
     # 一次单摆运动
     # 按照4个象限来分别的话，从左到右的摆动和从右到左的摆动
@@ -145,7 +158,7 @@ def process_one_sample(left_degree, right_degree, L, dt, shape_value, shape_path
     total_degree = left_degree + right_degree
     frames = total_degree * 2 / dt 
 
-    save_mp4(frames, shape_value, shape_path, x_list, y_list)
+    save_mp4(frames, shape_value, shape_path, x_list, y_list, background)
     save_index(x_list, shape_index_path)
 
 def random_shape(degree_boundary: list):
@@ -188,16 +201,21 @@ def main(params, shape: str, infos: list, deg):
     dt = params.dt  # 时间步长
     res_config = []
     left_degree, right_degree = deg
-
     print(f"left_degree: {left_degree}, right_degree: {right_degree}")
 
+    background = params.background
+    root_path = params.save_root_path
+    save_path = Path(root_path.replace('pendulum', f"pendulum_{background}")) / "raw/data"
+    save_index_path = Path(root_path.replace('pendulum', f"pendulum_{background}")) / "raw/index_mapping"
+    config_save_path = Path(root_path.replace('pendulum', f"pendulum_{background}")) / "config"
+
     # 保存动画到文件
-    path = os.path.join(f"{params.save_path}", shape, f"left{left_degree}_right{right_degree}")
+    path = os.path.join(f"{save_path}", shape, f"left{left_degree}_right{right_degree}")
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
 
     # 保存index，作为融合的索引
-    index_path = os.path.join(f"{params.save_index_path}", shape)
+    index_path = os.path.join(f"{save_index_path}", shape)
     if not os.path.exists(index_path):
         os.makedirs(index_path, exist_ok=True)
 
@@ -220,7 +238,7 @@ def main(params, shape: str, infos: list, deg):
             shape_path = os.path.join(path, f"left{left_degree}_right{right_degree}_{shape}_{idx}.mp4")
             shape_index_path = os.path.join(index_path, f"left{left_degree}_right{right_degree}_{shape}_{idx}.json")
 
-            process_one_sample(left_degree, right_degree, l, dt, shape_instance, shape_path, shape_index_path)
+            process_one_sample(left_degree, right_degree, l, dt, shape_instance, shape_path, shape_index_path, background)
 
     elif shape == 'rect':
 
@@ -244,11 +262,10 @@ def main(params, shape: str, infos: list, deg):
             shape_path = os.path.join(path, f"left{left_degree}_right{right_degree}_{shape}_{idx}.mp4")
             shape_index_path = os.path.join(index_path, f"left{left_degree}_right{right_degree}_{shape}_{idx}.json")
 
-            process_one_sample(left_degree, right_degree, l, dt, shape_instance, shape_path, shape_index_path)
+            process_one_sample(left_degree, right_degree, l, dt, shape_instance, shape_path, shape_index_path, background)
 
     # save config 
-    # TODO: 这里需要改一下位置，因为单选项的话实例化不了
-    config_path = os.path.join(f"{params.config_save_path}")
+    config_path = os.path.join(f"{config_save_path}")
     if not os.path.exists(config_path):
         os.makedirs(config_path, exist_ok=True)
     
@@ -277,11 +294,12 @@ def init_params(config):
 
     # finish file check 
     print('*' * 50)
-    data_path = Path(config.save_path)
-    data_list = list(data_path.glob('**/*.mp4'))
+    root_path = config.save_root_path
+    save_path = Path(root_path.replace('pendulum', f"pendulum_{config.background}")) / "raw/data"
+    data_list = list(save_path.glob('**/*.mp4'))
     print(f"Total {len(data_list)} files generated!")
     # shape check
-    for shape in data_path.iterdir():
+    for shape in save_path.iterdir():
         print(f"shape: {shape.name}, total: {len(list(shape.glob('*.mp4')))}")
     print('*' * 50)
 

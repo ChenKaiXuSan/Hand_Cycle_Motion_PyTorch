@@ -6,11 +6,14 @@ hydra:
 dt: 1 # time interval
 
 # path
-save_path: /workspace/data/pendulum/raw/data/
-save_index_path: /workspace/data/pendulum/raw/index_mapping/
-config_save_path: /workspace/data/pendulum/config/
+save_root_path: /workspace/data/pendulum/
+# save_path: /workspace/data/pendulum/raw/data/
+# save_index_path: /workspace/data/pendulum/raw/index_mapping/
+# config_save_path: /workspace/data/pendulum/config/
 
 temp_save_fig_path: /workspace/data/pendulum/temp_fig/
 
 shape: ['circle', 'rect']
 degree_boundary: [135, 90, 45]
+
+background: black # ['white', 'black', 'none']
