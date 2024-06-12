@@ -143,6 +143,7 @@ class DefineCrossValidation(object):
                 res_dict[one_class.name] = []
         
         # make inverse dict
+        # TODO:　这里有问题，因为更改了目录树
         str_list = res_dict.keys()
         def extract_numbers(s):
             left, right = re.findall(r'\d+', s)

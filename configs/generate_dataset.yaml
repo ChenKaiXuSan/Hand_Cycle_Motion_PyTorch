@@ -3,7 +3,7 @@ hydra:
   run:
     dir: /workspace/code/logs/prepare_dataset/${now:%Y-%m-%d}/${now:%H-%M-%S}
 
-dt: 1 # time interval
+dt: 2 # time interval
 
 # path
 save_root_path: /workspace/data/pendulum/
@@ -17,3 +17,4 @@ shape: ['circle', 'rect']
 degree_boundary: [135, 90, 45]
 
 background: black # ['white', 'black', 'none']
+asymmetry_degree: [0, 20, 30, 40] # Asymmetric angles
