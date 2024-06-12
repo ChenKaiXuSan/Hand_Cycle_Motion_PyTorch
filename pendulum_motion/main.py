@@ -11,7 +11,7 @@ Comment:
 
 Have a good code time :)
 -----
-Last Modified: Friday May 31st 2024 7:30:04 am
+Last Modified: Friday June 7th 2024 12:56:34 pm
 Modified By: the developer formerly known as Kaixu Chen at <chenkaixusan@gmail.com>
 -----
 Copyright (c) 2024 The University of Tsukuba
@@ -205,9 +205,10 @@ def main(params, shape: str, infos: list, deg):
 
     background = params.background
     root_path = params.save_root_path
-    save_path = Path(root_path.replace('pendulum', f"pendulum_{background}")) / "raw/data"
-    save_index_path = Path(root_path.replace('pendulum', f"pendulum_{background}")) / "raw/index_mapping"
-    config_save_path = Path(root_path.replace('pendulum', f"pendulum_{background}")) / "config"
+
+    save_path = Path(root_path.replace('pendulum', f"pendulum_{background}_{dt}")) / "raw/data"
+    save_index_path = Path(root_path.replace('pendulum', f"pendulum_{background}_{dt}")) / "raw/index_mapping"
+    config_save_path = Path(root_path.replace('pendulum', f"pendulum_{background}_{dt}")) / "config"
 
     # 保存动画到文件
     path = os.path.join(f"{save_path}", shape, f"left{left_degree}_right{right_degree}")
@@ -300,7 +301,7 @@ def init_params(config):
     print(f"Total {len(data_list)} files generated!")
     # shape check
     for shape in save_path.iterdir():
-        print(f"shape: {shape.name}, total: {len(list(shape.glob('*.mp4')))}")
+        print(f"shape: {shape.name}, total: {len(list(shape.glob('**/*.mp4')))}")
     print('*' * 50)
 
 if '__main__' == __name__:

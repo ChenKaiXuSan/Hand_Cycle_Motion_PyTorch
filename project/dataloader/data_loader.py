@@ -80,7 +80,7 @@ class PendulumDataModule(LightningDataModule):
                 UniformTemporalSubsample(self.uniform_temporal_subsample_num),
                 Div255(),
                 Resize(size=[self._IMG_SIZE, self._IMG_SIZE]),
-                AddGaussianNoise(),
+                # AddGaussianNoise(), # TODO: 对比一下实验结果
             ]
         )
 
@@ -95,7 +95,7 @@ class PendulumDataModule(LightningDataModule):
                             UniformTemporalSubsample(
                                 self.uniform_temporal_subsample_num
                             ),
-                            AddGaussianNoise(),
+                            # AddGaussianNoise(),
                         ]
                     ),
                 ),

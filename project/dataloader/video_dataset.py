@@ -141,7 +141,10 @@ class LabeledGaitVideoDataset(torch.utils.data.Dataset):
 
     def move_transform(self, vframes: torch.Tensor) -> None:
 
-        if self._transform is not None:
+        if self._experiment == "temporal_mix":
+            transformed_img = self._transform.transforms[1](vframes.permute(1, 0, 2, 3))
+            return transformed_img # c, t, h, w
+        elif self._transform is not None:
             transformed_img = self._transform(vframes.permute(1, 0, 2, 3))
             return transformed_img  # c, t, h, w
         else:

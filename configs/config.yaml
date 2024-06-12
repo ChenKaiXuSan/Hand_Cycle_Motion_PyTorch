@@ -9,12 +9,12 @@ optimizer:
   beta2: 0.999
 
 data:
-  background: black # ['white', 'black', 'non']
-  data_path: /workspace/data/pendulum_${data.background}/raw/data/
-  index_path: /workspace/data/pendulum_${data.background}/raw/index_mapping/
-  config_path: /workspace/data/pendulum_${data.background}/config/
-  # temp_save_fig_path: /workspace/data/pendulum/temp_fig/
-  class_to_num: /workspace/data/pendulum_${data.background}/class_to_num.json  # the class to num mapping
+  background: black # ['white', 'black', 'none']
+  dt: 2
+  data_path: /workspace/data/pendulum_${data.background}_${data.dt}/raw/data/
+  index_path: /workspace/data/pendulum_${data.background}_${data.dt}/raw/index_mapping/
+  config_path: /workspace/data/pendulum_${data.background}_${data.dt}/config/
+  class_to_num: /workspace/data/pendulum_${data.background}_${data.dt}/class_to_num.json  # the class to num mapping
 
   num_workers: 4
   img_size: 224
