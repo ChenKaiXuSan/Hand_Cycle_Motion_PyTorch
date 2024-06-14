@@ -20,7 +20,9 @@ HISTORY:
 Date      	By	Comments
 ----------	---	---------------------------------------------------------
 
-12-06-2024	Kaixu Chen	现在按照对称/非对称进行分类，对于非对称的情况，我们需要考虑一个bias，也就是说，摆动的幅度不是完全对称的。
+14-06-2024	Kaixu Chen	optimised code
+
+12-06-2024	Kaixu Chen	Now categorise by symmetric/asymmetric, for the asymmetric case we need to consider a bias, i.e. the amplitude of the oscillations is not perfectly symmetric.
 """
 
 import numpy as np
@@ -30,43 +32,6 @@ import itertools
 import multiprocessing
 import hydra
 from pathlib import Path
-
-
-def symmetry_one_cycle(max_left_theta, max_right_theta, L, dt):
-
-    x_list = []
-    y_list = []
-    L = 1
-    # left to right
-    left_degree = max_left_theta
-    while left_degree > 0:
-        theta = np.radians(left_degree)
-        x_list.append(-L * np.sin(theta))
-        y_list.append(-L * np.cos(theta))
-        left_degree -= dt
-
-    right_degree = 0
-    while right_degree < max_right_theta:
-        theta = np.radians(right_degree)
-        x_list.append(L * np.sin(theta))
-        y_list.append(-L * np.cos(theta))
-        right_degree += dt
-
-    # right to left
-    while right_degree > 0:
-        theta = np.radians(right_degree)
-        x_list.append(L * np.sin(theta))
-        y_list.append(-L * np.cos(theta))
-        right_degree -= dt
-
-    left_degree = 0
-    while left_degree < max_left_theta:
-        theta = np.radians(left_degree)
-        x_list.append(-L * np.sin(theta))
-        y_list.append(-L * np.cos(theta))
-        left_degree += dt
-
-    return x_list, y_list
 
 
 def asymmetry_one_cycle(max_left_theta, max_right_theta, L, dt, bias: int = 0):
@@ -230,6 +195,7 @@ def process_one_sample(
     save_mp4(frames, shape_value, shape_path, x_list, y_list, background)
     save_index(x_list, shape_index_path)
 
+
 def random_shape(degree_boundary: list):
 
     # 配置形状，从三个形状里面选择一个
@@ -253,13 +219,12 @@ def random_shape(degree_boundary: list):
     )
     np.random.shuffle(rect_list)
 
-    rect_split_index = int(0.2 * len(rect_list))
-
     shape_info = {"circle": circle_list, "rect": rect_list}
 
     # 对称的角度
-    # degree = list(itertools.product(degree_boundary, degree_boundary))
-    degree = [(i, j) for i, j in itertools.product(degree_boundary, repeat=2) if i == j]
+    degree = list(itertools.product(degree_boundary, degree_boundary))
+    # 非对称的角度
+    # degree = [(i, j) for i, j in itertools.product(degree_boundary, repeat=2) if i == j]
     return shape_info, degree
 
 
@@ -291,9 +256,14 @@ def main(params, shape: str, infos: list, deg, asymmetry_flag: int = 0):
     # 保存动画到文件
     # 保存index，作为融合的索引
     path = os.path.join(
-        f"{save_path}", f'assymmetry_degree{asymmetry_flag}', shape, f"left{left_degree}_right{right_degree}"
+        f"{save_path}",
+        f"assymmetry_degree{asymmetry_flag}",
+        shape,
+        f"left{left_degree}_right{right_degree}",
     )
-    index_path = os.path.join(f"{save_index_path}", f'assymmetry_degree{asymmetry_flag}', shape)
+    index_path = os.path.join(
+        f"{save_index_path}", f"assymmetry_degree{asymmetry_flag}", shape
+    )
 
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
@@ -398,7 +368,7 @@ def init_params(config):
     for shape, shape_info in random_index.items():
         for deg in degree:
             for i in config.asymmetry_degree:
-                # main(config, shape, shape_info, deg, i) # only for test
+                # main(config, shape, shape_info, deg, i) # ! only for test
 
                 multi_process = multiprocessing.Process(
                     target=main, args=(config, shape, shape_info, deg, i)

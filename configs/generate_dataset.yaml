@@ -17,4 +17,4 @@ shape: ['circle', 'rect']
 degree_boundary: [135, 90, 45]
 
 background: black # ['white', 'black', 'none']
-asymmetry_degree: [0, 20, 30, 40] # Asymmetric angles
+asymmetry_degree: [0, 20] # Asymmetric angles
