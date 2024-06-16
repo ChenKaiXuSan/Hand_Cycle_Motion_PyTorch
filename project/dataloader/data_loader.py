@@ -45,16 +45,6 @@ from pytorchvideo.data.labeled_video_dataset import labeled_video_dataset
 
 from video_dataset import labeled_gait_video_dataset
 
-disease_to_num_mapping_Dict: Dict = {
-    4: {
-        "left45_right45": 0,
-        "left45_right90": 1,
-        "left90_right45": 2,
-        "left90_right90": 3,
-    },
-}
-
-
 class PendulumDataModule(LightningDataModule):
     def __init__(self, opt, dataset_idx: Dict = None):
         super().__init__()

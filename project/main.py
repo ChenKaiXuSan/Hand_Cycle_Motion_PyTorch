@@ -123,7 +123,7 @@ def train(hparams, dataset_idx, fold):
     trainer.test(
         classification_module,
         data_module,
-        # ckpt_path="best",
+        ckpt_path="best",
     )
 
     if "single" in hparams.train.experiment:
@@ -143,7 +143,6 @@ def train(hparams, dataset_idx, fold):
         data_module,
         fold,
     )
-
 
 @hydra.main(
     version_base=None,

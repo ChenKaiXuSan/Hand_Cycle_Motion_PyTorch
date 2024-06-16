@@ -10,7 +10,7 @@ Comment:
 
 Have a good code time :)
 -----
-Last Modified: Monday June 3rd 2024 7:28:54 am
+Last Modified: Friday June 14th 2024 1:21:22 pm
 Modified By: the developer formerly known as Kaixu Chen at <chenkaixusan@gmail.com>
 -----
 Copyright (c) 2024 The University of Tsukuba
@@ -75,7 +75,7 @@ class DefineCrossValidation(object):
 
         return train_mapped_path, val_mapped_path
 
-    def make_dataset_with_video(self, dataset_idx: list, fold: int, flag: str, X: list, y: list, shape):
+    def make_dataset_with_video(self, dataset_idx: list, fold: int, flag: str, X: list, y: list):
 
         target_path = self.video_path.parent.parent / f"fold{fold}" / 'data' / flag
         target_index_path = self.index_path.parent.parent / f"fold{fold}" / 'index_mapping' / flag
@@ -83,9 +83,10 @@ class DefineCrossValidation(object):
         for i in dataset_idx:
             video_path = X[i] 
             video_label = y[i]
-            class_type = str(video_path).split("/")[-2]
+            class_type = str(video_path).split("/")[-4]
+            shape = str(video_path).split("/")[-3]
 
-            index_path = '/'.join(str(video_path).split('/')[:-4]) + '/index_mapping/' + str(video_path).split('/')[6] + '/' + str(video_path).split('/')[-1].replace('mp4', 'json')
+            index_path = '/'.join(str(video_path).split('/')[:-5]) + '/index_mapping/' + str(video_path).split('/')[6] + f'/{shape}/' + str(video_path).split('/')[-1].replace('mp4', 'json')
 
             _t_path = target_path / class_type 
             _t_index_path = target_index_path 
@@ -99,7 +100,7 @@ class DefineCrossValidation(object):
             shutil.copy(video_path, _t_path / video_path.name)
             shutil.copy(index_path, _t_index_path / Path(video_path.name.split('.')[0] +".json"))
 
-        print(f"fold {fold} shape {shape} {flag} dataset has been created.")        
+        print(f"fold {fold} {flag} dataset has been created.")        
 
     @staticmethod
     def magic_move(train_mapped_path, val_mapped_path):
@@ -138,18 +139,18 @@ class DefineCrossValidation(object):
     def get_total_dataset(self, class_num: int, raw_video_path: Path) -> Dict:
 
         res_dict = {}
-        for shape in raw_video_path.iterdir():
-            for one_class in shape.iterdir():
-                res_dict[one_class.name] = []
+        for one_class in raw_video_path.iterdir():
+            res_dict[one_class.name] = []
         
         # make inverse dict
         # TODO:　这里有问题，因为更改了目录树
         str_list = res_dict.keys()
-        def extract_numbers(s):
-            left, right = re.findall(r'\d+', s)
-            return int(left), int(right)
+        # def extract_numbers(s):
+        #     left, right = re.findall(r'\d+', s)
+        #     return int(left), int(right)
         
-        inverse_dict = sorted(str_list, key=extract_numbers)
+        # inverse_dict = sorted(str_list, key=extract_numbers)
+        inverse_dict = sorted(str_list)
         inverse_dict = {v: k for k, v in enumerate(inverse_dict)}
 
         # save inverse dict 
@@ -158,22 +159,18 @@ class DefineCrossValidation(object):
 
         final_dict = {}
 
-        for shape in raw_video_path.iterdir():
+        X, y = [], []
 
-            X, y = [], []
+        for one_class in raw_video_path.iterdir():
+            
+            path = list(one_class.glob('**/*.mp4'))
+            label = [inverse_dict[one_class.name]] * len(path)
 
-            for one_class in shape.iterdir():
+            X.extend(path)
+            y.extend(label)
+            
 
-                one_class_list = list(one_class.iterdir())
-
-                for i in one_class_list:
-                    X.append(i)
-                    class_type = '_'.join(i.name.split("_")[:2])
-                    y.append(inverse_dict[class_type])
-
-            final_dict[shape.name] = [X, y]
-
-        return final_dict
+        return X, y
 
     def prepare(self):
         """define cross validation first, with the K.
@@ -189,7 +186,7 @@ class DefineCrossValidation(object):
         """
         K = self.K
 
-        total_shape_dict = self.get_total_dataset(self.class_num, self.video_path)
+        X, y = self.get_total_dataset(self.class_num, self.video_path)
         
         # define the cross validation
         # X: video path, in path.Path foramt. len = 1954
@@ -200,12 +197,11 @@ class DefineCrossValidation(object):
         # sgkf = StratifiedGroupKFold(n_splits=K)
         kfold = KFold(n_splits=K, shuffle=True, random_state=42)
 
-        for shape, [X, y] in total_shape_dict.items():
-            circle_kfold = list(kfold.split(X=X, y=y))
+        circle_kfold = list(kfold.split(X=X, y=y))
 
-            for f in range(K):
-                self.make_dataset_with_video(circle_kfold[f][0], f, "train", X, y, shape)
-                self.make_dataset_with_video(circle_kfold[f][1], f, "val", X, y, shape)
+        for f in range(K):
+            self.make_dataset_with_video(circle_kfold[f][0], f, "train", X, y)
+            self.make_dataset_with_video(circle_kfold[f][1], f, "val", X, y)
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         
